@@ -5,6 +5,7 @@ import csv
 from qrcode.main import QRCode
 import qrcode.constants
 from PIL import Image, ImageFont, ImageDraw
+from tqdm import tqdm
 
 BOX_COUNT = 21
 
@@ -141,15 +142,24 @@ def make_img(code: str, options: Options):
     return img
 
 
+# def resolve_cwd_path(p: Path):
+#     if p.is_absolute():
+#         return p
+#     print(Path.cwd())
+#     return Path.cwd() / p
+
+
 def main():
     options = Options.from_argv()
-
-    with options.input_csv_file_path.open(mode="r", encoding="utf-8") as input_file:
-        reader = csv.reader(input_file)
-        for row in reader:
-            code = row[0]
+    with options.input_csv_file_path.resolve().open(mode="r", encoding="utf-8") as input_file:
+        codes = [row[0] for row in csv.reader(input_file)]
+        for code in tqdm(
+            codes,
+            total=len(codes),
+            unit="qrcode",
+        ):
             img = make_img(code, options)
-            img.save(options.output_dir_path / f"{code}.png")
+            img.save(options.output_dir_path.resolve() / f"{code}.png")
 
 
 if __name__ == "__main__":
