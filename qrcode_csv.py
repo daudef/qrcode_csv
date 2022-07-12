@@ -7,7 +7,7 @@ import qrcode.constants
 from PIL import Image, ImageFont, ImageDraw
 from tqdm import tqdm
 
-BOX_COUNT = 21
+# BOX_COUNT = 21
 
 BOX_SIZE_DEFAULT = 30
 TOP_PADDING_DEFAULT = 170
@@ -17,6 +17,8 @@ TEXT_SIZE_DEFAULT = 100
 TEXT_FONT_DEFAULT = "Arial"
 FRONT_COLOR_DEFAULT = "black"
 BACKGROUND_COLOR_DEFAULT = "transparent"
+MIN_VERSION_DEFAULT = 1
+ERROR_CORRECTION_DEFAULT = "H"
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -31,6 +33,8 @@ class Options:
     text_font: str
     front_color: str
     background_color: str
+    min_version: int
+    error_correction: str
 
     @classmethod
     def from_argv(cls):
@@ -96,13 +100,38 @@ class Options:
             help="Background color of the image",
             dest="background_color",
         )
+        parser.add_argument(
+            "--min-version",
+            type=int,
+            default=1,
+            required=False,
+            help="Minimum version of the QR code, 1-40, can be greater if the text is too long",
+            dest="min_version",
+        )
+        parser.add_argument(
+            "--error-correction",
+            type=str,
+            choices=["L", "M", "Q", "H"],
+            default=ERROR_CORRECTION_DEFAULT,
+            help="Error correction level",
+            dest="error_correction",
+        )
         return cls(**vars(parser.parse_args()))
+
+
+def map_error_correction(char: str):
+    return {
+        "L": qrcode.constants.ERROR_CORRECT_L,
+        "M": qrcode.constants.ERROR_CORRECT_M,
+        "Q": qrcode.constants.ERROR_CORRECT_Q,
+        "H": qrcode.constants.ERROR_CORRECT_H,
+    }[char]
 
 
 def make_img(code: str, options: Options):
     qr = QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        version=options.min_version,
+        error_correction=map_error_correction(options.error_correction),
         box_size=BOX_SIZE_DEFAULT,
         border=0,
     )
@@ -110,14 +139,13 @@ def make_img(code: str, options: Options):
     qr.make(fit=True)
     code_img = qr.make_image(fill_color=options.front_color, back_color=options.background_color)
 
-    code_width = BOX_COUNT * options.box_size
-    code_height = BOX_COUNT * options.box_size
+    code_size = (17 + 4 * qr.version) * options.box_size
 
     img = Image.new(
         "RGBA",
         (
-            code_width + 2 * options.side_padding,
-            code_height + options.top_padding + options.bottom_padding,
+            code_size + 2 * options.side_padding,
+            code_size + options.top_padding + options.bottom_padding,
         ),
         color=options.background_color
         if options.background_color != "transparent"
@@ -130,8 +158,8 @@ def make_img(code: str, options: Options):
 
     d.text(
         (
-            options.side_padding + code_width / 2,
-            options.top_padding + code_height + options.bottom_padding / 2,
+            options.side_padding + code_size / 2,
+            options.top_padding + code_size + options.bottom_padding / 2,
         ),
         code,
         font=fnt,
@@ -140,13 +168,6 @@ def make_img(code: str, options: Options):
         anchor="mm",
     )
     return img
-
-
-# def resolve_cwd_path(p: Path):
-#     if p.is_absolute():
-#         return p
-#     print(Path.cwd())
-#     return Path.cwd() / p
 
 
 def main():

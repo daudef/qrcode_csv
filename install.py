@@ -63,7 +63,7 @@ def main():
         f.write(
             f"""#!/usr/bin/env sh
 source {APP_DIR}/env/bin/activate
-python3 {APP_DIR}/{APP_NAME}.py $@"""
+python {APP_DIR}/{APP_NAME}.py $@"""
         )
     os.chmod(executable_path, 0o755)
 
