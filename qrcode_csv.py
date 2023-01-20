@@ -186,7 +186,6 @@ def main():
     with options.input_csv_file_path.resolve().open(mode="r", encoding="utf-8") as input_file:
         codes = [clean_code(line) for line in input_file]
         for code in util.iter_track(codes, name="Generation QR Codes", unit="qrcode"):
-            print(list(map(ord, code)))
             img = make_img(code, options)
             img.save(output_dir_path.resolve() / f"{code}.png")
 
