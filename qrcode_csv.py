@@ -1,11 +1,10 @@
 from argparse import ArgumentParser
 from dataclasses import dataclass
 from pathlib import Path
-import csv
 from qrcode.main import QRCode
 import qrcode.constants
 from PIL import Image, ImageFont, ImageDraw
-from tqdm import tqdm
+import util
 
 # BOX_COUNT = 21
 
@@ -24,7 +23,7 @@ ERROR_CORRECTION_DEFAULT = "H"
 @dataclass(frozen=True, kw_only=True)
 class Options:
     input_csv_file_path: Path
-    output_dir_path: Path
+    output_dir_path: Path | None
     box_size: int
     top_padding: int
     side_padding: int
@@ -43,7 +42,11 @@ class Options:
             "input_csv_file_path", type=Path, help="Path to a CSV file with the list of labels"
         )
         parser.add_argument(
-            "output_dir_path", type=Path, help="Path to a directory to save QR codes"
+            "--output",
+            type=Path,
+            help="Path to a directory to save QR codes",
+            required=False,
+            dest="output_dir_path",
         )
         parser.add_argument(
             "--box-size",
@@ -170,17 +173,22 @@ def make_img(code: str, options: Options):
     return img
 
 
+def clean_code(s: str):
+    return "".join(util.char_to_ascii(c) for c in s).strip()
+
+
 def main():
     options = Options.from_argv()
+    output_dir_path = options.output_dir_path
+    if output_dir_path is None:
+        output_dir_path = options.input_csv_file_path.parent / options.input_csv_file_path.name
+    output_dir_path.mkdir(parents=True, exist_ok=True)
     with options.input_csv_file_path.resolve().open(mode="r", encoding="utf-8") as input_file:
-        codes = [row[0] for row in csv.reader(input_file)]
-        for code in tqdm(
-            codes,
-            total=len(codes),
-            unit="qrcode",
-        ):
+        codes = [clean_code(line) for line in input_file]
+        for code in util.iter_track(codes, name="Generation QR Codes", unit="qrcode"):
+            print(list(map(ord, code)))
             img = make_img(code, options)
-            img.save(options.output_dir_path.resolve() / f"{code}.png")
+            img.save(output_dir_path.resolve() / f"{code}.png")
 
 
 if __name__ == "__main__":
